@@ -27,7 +27,7 @@ a + -2.1 * 34;<br>
 10 * (+5.0/2);<br>
 a = +30;<br>
 a * a;<br>
-$ ./expreval input.txt
+$ ./expreval input.txt<br>
 -171.4<br>
 25.0<br>
 900.0<br>
