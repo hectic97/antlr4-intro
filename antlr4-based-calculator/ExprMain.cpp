@@ -1,4 +1,6 @@
 #include <iostream>
+#include <cctype>
+#include <cmath>
 
 #include "antlr4-cpp/ExprBaseListener.h"
 #include "antlr4-cpp/ExprLexer.h"
@@ -8,53 +10,142 @@ using namespace std;
 using namespace antlr4;
 using namespace antlr4::tree;
 
+int op_rank(char op){
+	if(op == '*' || op == '/')
+		return 2;
+	if(op == '+' || op == '-')
+		return 1;
+	return 0;
+}
+
+double cal_op(double a,double b,char op){
+	if (op == '*')
+		return a * b;
+	else if (op == '/')
+		return a / b;
+	else if (op == '+')
+		return a + b;
+	else
+		return a - b;
+}
+
+
 class EvalListener : public ExprBaseListener {
 	map<string,double> vars;
-	stack<string> id_vars;
-	stack<string> fullStack;
 	int asgn = 0;
-	string key;
-	vector<string> array;
+
+	list<string> terminal;
+	list<string>::iterator temp;
 public:
 	virtual void enterProg(ExprParser::ProgContext *ctx) {
-		cout << "enterProg: "<< ctx->getText();
-		string all = ctx->getText();
-		std::replace(all.begin(),all.end(),'\n',';');
-		stringstream ss(all);
-		string temp;
-		while (ss >> temp){
-			array.push_back(temp);
-			cout<< "\ntemp:"<<temp<<endl;
-		}
-		
 	}
 	virtual void exitProg(ExprParser::ProgContext *ctx) {
-		cout << "exitProg: ";
-		for (std::stack<string> dump = fullStack; !dump.empty(); dump.pop())
-			std::cout << dump.top() << '\n';
+		stack <string> val;
+		stack <char> op;
+		int assn_sign = 0;
+
+		for (temp = terminal.begin(); temp != terminal.end();temp++)
+		{
+			if (assn_sign == 1)
+			{
+				vars.insert(pair<string,double>(val.top(),atof((*temp).c_str())));
+				vars[val.top()] = atof((*temp).c_str());
+				val.pop();
+				assn_sign = 2;	
+			}
+			if(*temp == "(")
+				op.push((*temp)[0]);
+			else if (*temp == ")"){
+				while (!op.empty() && op.top() != '('){
+					double cal_val_1;
+				        if (isalpha(val.top()[0]))
+						cal_val_1 = vars[val.top()];
+					else
+						cal_val_1 = atof(val.top().c_str());
+					val.pop();
+					double cal_val_2;
+					if (isalpha(val.top()[0]))
+						cal_val_2 = vars[val.top()];
+					else
+						cal_val_2 = atof(val.top().c_str());
+					val.pop();
+					char opr = op.top();
+					op.pop();
+					val.push(to_string(cal_op(cal_val_2,cal_val_1,opr)));
+					
+				}
+				if (!op.empty())
+					op.pop();
+			}
+			else if (*temp == "=")
+				assn_sign = 1;
+			else if (*temp == "+" || *temp == "-" || *temp == "*" || *temp == "/"){
+				while (!op.empty() && op_rank(op.top()) >= op_rank((*temp)[0])){
+					double cal_val_1;
+					if (isalpha(val.top()[0]))
+						cal_val_1 = vars[val.top()];
+					else
+						cal_val_1 = atof(val.top().c_str());
+					val.pop();
+					double cal_val_2;
+					if (isalpha(val.top()[0]))
+						cal_val_2 = vars[val.top()];
+					else
+						cal_val_2 = atof(val.top().c_str());
+					val.pop();
+					char opr = op.top();
+					op.pop();
+					val.push(to_string(cal_op(cal_val_2,cal_val_1,opr)));
+							
+				}
+				op.push((*temp)[0]);
+
+			}
+			else if (*temp == ";")
+			{
+				while (!op.empty()){
+					double cal_val_1;
+					if (isalpha(val.top()[0]))
+						cal_val_1 = vars[val.top()];
+					else
+						cal_val_1 = atof(val.top().c_str());
+					val.pop();
+					double cal_val_2;
+					if (isalpha(val.top()[0]))
+						cal_val_2 = vars[val.top()];
+					else
+						cal_val_2 = atof(val.top().c_str());
+					val.pop();
+					char opr = op.top();
+					op.pop();
+					val.push(to_string(cal_op(cal_val_2,cal_val_1,opr)));
+				}
+				cout.setf(ios::fixed);
+				cout.precision(1);
+				if (assn_sign != 2)
+					cout << std::round(atof(val.top().c_str())*10)/10 << endl;
+				stack <string> val;
+				stack <char> op;
+				assn_sign = 0;
+
+			}
+			else{
+				val.push(*temp);
+			}
+		}
+
+
+
 
 	}
 	virtual void enterExpr(ExprParser::ExprContext *ctx) {
-		cout << "\tenterExpr: \n";
 	}
 	virtual void exitExpr(ExprParser::ExprContext *ctx) {
-		cout << "\texitExpr: \n";
 	}
 	virtual void visitTerminal(tree::TerminalNode *node) {
-		cout << "\t\tTerminal: " << node->getText() << "\n";
-		if (asgn == 1){
-			vars.insert(pair<string,double>(key,atof(node->getText().c_str())));
-			vars[key]=atof(node->getText().c_str());
-			cout<< key << ":" << vars[key] << endl;
-			asgn = 0;
-		}
-		if (node->getText() == "="){
-			asgn = 1;
-			key = fullStack.top();
-		}
-		fullStack.push(node->getText());
-		if (node->getSymbol()->getType() == ExprLexer::INT){
-		int v = atoi(node->getText().c_str());
+		if ((node->getSymbol()->getType() != ExprLexer::NEWLINE) && (node->getSymbol()->getType() != ExprLexer::WS))
+		{
+			terminal.push_back(node->getText());
 		}
 	}
 	
@@ -72,16 +163,14 @@ int main(int argc, const char* argv[]) {
 		exit(0);
 	}
 
-	cout << "---Expression Evaluation with ANTLR listener---\n";
 	ANTLRInputStream input(stream);
 	ExprLexer lexer(&input);
 	CommonTokenStream tokens(&lexer);
 	ExprParser parser(&tokens);	
-	//ParseTree *tree = parser.prog();
-	//cout << tree -> toStringTree(&parser) <<endl;
+
 	ParseTreeWalker walker;
 	EvalListener listener;	
 
 	walker.walk(&listener, parser.prog());
-//	cout << evalStack;
+
 }
