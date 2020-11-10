@@ -16,7 +16,7 @@ Assign values to variable<br>
 
 ## How to use
 
-$ make
+$ make<br>
 $ ./expreval input.txt
 
 ## Test
